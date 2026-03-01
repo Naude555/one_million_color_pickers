@@ -10,23 +10,7 @@ defmodule ColorPickerLive.PickersFixtures do
   def picker_fixture(attrs \\ %{}) do
     {:ok, picker} =
       attrs
-      |> Enum.into(%{
-        color: "some color"
-      })
-      |> ColorPickerLive.Pickers.create_picker()
-
-    picker
-  end
-
-  @doc """
-  Generate a picker.
-  """
-  def picker_fixture(attrs \\ %{}) do
-    {:ok, picker} =
-      attrs
-      |> Enum.into(%{
-
-      })
+      |> Enum.into(%{color: "#112233"})
       |> ColorPickerLive.Pickers.create_picker()
 
     picker
