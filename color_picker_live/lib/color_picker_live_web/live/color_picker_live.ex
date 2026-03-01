@@ -95,10 +95,9 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
         <div
           id="color-picker-container"
           class="h-[calc(100vh-13rem)] overflow-y-auto rounded-xl border border-zinc-200 bg-zinc-50 p-3"
-          phx-update="stream"
           phx-hook="InfiniteScroll"
         >
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-2">
+          <div id="pickers-grid" class="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-2" phx-update="stream">
             <.picker :for={{dom_id, picker} <- @streams.pickers} dom_id={dom_id} picker={picker} />
           </div>
         </div>

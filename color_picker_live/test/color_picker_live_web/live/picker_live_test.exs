@@ -33,4 +33,33 @@ defmodule ColorPickerLiveWeb.PickerLiveTest do
 
     assert render(view) =~ "#abcdef"
   end
+
+  test "changing a color keeps the picker in place", %{conn: conn} do
+    pickers =
+      Enum.map(1..6, fn index ->
+        picker_fixture(%{color: "#11111#{rem(index, 10)}"})
+      end)
+
+    target_picker = Enum.at(pickers, 2)
+
+    {:ok, view, _html} = live(conn, ~p"/color_pickers?page=1&per_page=6")
+
+    before_ids = visible_picker_ids(render(view))
+
+    assert before_ids == Enum.map(pickers, & &1.id)
+
+    view
+    |> element("button[phx-value-id='#{target_picker.id}']")
+    |> render_click()
+
+    after_ids = visible_picker_ids(render(view))
+
+    assert after_ids == before_ids
+  end
+
+  defp visible_picker_ids(html) do
+    Regex.scan(~r/phx-value-id=['\"](\d+)['\"]/, html, capture: :all_but_first)
+    |> List.flatten()
+    |> Enum.map(&String.to_integer/1)
+  end
 end
