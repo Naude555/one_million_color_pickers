@@ -4,21 +4,23 @@ defmodule ColorPickerLiveWeb.PickerLiveTest do
   import Phoenix.LiveViewTest
   import ColorPickerLive.PickersFixtures
 
-  test "renders current page and supports page navigation via URL", %{conn: conn} do
-    Enum.each(1..8, fn index ->
+  test "scroll events update URL page without prev/next buttons", %{conn: conn} do
+    Enum.each(1..12, fn index ->
       picker_fixture(%{color: "#00000#{rem(index, 10)}"})
     end)
 
     {:ok, view, html} = live(conn, ~p"/color_pickers?page=2&per_page=2")
 
     assert html =~ "One Million Color Pickers"
-    assert html =~ "Page"
+    assert html =~ "Current page"
     assert has_element?(view, "#color-picker-container")
+    refute html =~ "Next →"
+    refute html =~ "← Previous"
 
-    render_click(element(view, "a", "Next →"))
+    render_hook(view, "load-more-down", %{})
     assert_patch(view, ~p"/color_pickers?page=3&per_page=2&sort_by=id&sort_order=asc")
 
-    render_click(element(view, "a", "← Previous"))
+    render_hook(view, "load-more-up", %{})
     assert_patch(view, ~p"/color_pickers?page=2&per_page=2&sort_by=id&sort_order=asc")
   end
 

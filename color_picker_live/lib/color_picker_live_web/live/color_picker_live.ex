@@ -14,6 +14,7 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
      |> assign(:page_title, "One Million Color Pickers")
      |> assign(:is_loading, true)
      |> assign(:visible_picker_ids, MapSet.new())
+     |> assign(:pending_scroll_direction, :initial)
      |> assign(:options, %{sort_by: :id, sort_order: :asc, page: 1, per_page: @default_per_page})
      |> assign(:total_pickers, Pickers.count_pickers())}
   end
@@ -28,13 +29,15 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
 
     options = clamp_page_options(options, socket.assigns.total_pickers)
     pickers = paged_window(options)
+    direction = socket.assigns.pending_scroll_direction
 
     {:noreply,
      socket
      |> assign(:is_loading, false)
      |> assign(:options, options)
+     |> assign(:pending_scroll_direction, :idle)
      |> assign(:visible_picker_ids, MapSet.new(Enum.map(pickers, & &1.id)))
-     |> push_event("page-loaded", %{page: options.page})
+     |> push_event("page-loaded", %{page: options.page, direction: direction})
      |> stream(:pickers, pickers, reset: true)}
   end
 
@@ -62,27 +65,18 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
       <div class="mb-4 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
         <h1 class="text-2xl font-bold text-zinc-900">One Million Color Pickers</h1>
         <p class="mt-1 text-sm text-zinc-600">
-          Scroll to move page-by-page. The URL always tracks your current page and color updates are synced live.
+          Scroll continuously to browse pickers. Page swaps happen automatically and the URL tracks your position.
         </p>
 
         <div class="mt-3 flex flex-wrap items-center gap-2 text-sm">
-          <.link
-            patch={page_path(@options, @options.page - 1)}
-            class="rounded-md border border-zinc-300 px-3 py-1.5 font-medium text-zinc-800 hover:bg-zinc-100 disabled:opacity-50"
-          >
-            ← Previous
-          </.link>
-          <.link
-            patch={page_path(@options, @options.page + 1)}
-            class="rounded-md border border-zinc-300 px-3 py-1.5 font-medium text-zinc-800 hover:bg-zinc-100"
-          >
-            Next →
-          </.link>
           <span class="rounded-md bg-zinc-100 px-3 py-1.5 text-zinc-700">
-            Page <strong><%= @options.page %></strong>
+            Current page <strong><%= @options.page %></strong>
           </span>
           <span class="rounded-md bg-zinc-100 px-3 py-1.5 text-zinc-700">
             <%= @options.per_page %> per page
+          </span>
+          <span class="rounded-md bg-zinc-100 px-3 py-1.5 text-zinc-700">
+            Updates sync live across all open screens
           </span>
         </div>
       </div>
@@ -140,7 +134,7 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
         :down -> current_page + 1
       end
 
-    goto_page(socket, new_page)
+    goto_page(assign(socket, :pending_scroll_direction, direction), new_page)
   end
 
   defp goto_page(socket, page) when page > 0 do
