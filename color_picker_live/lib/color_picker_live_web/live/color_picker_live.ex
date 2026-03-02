@@ -4,7 +4,8 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
   alias ColorPickerLive.Pickers
 
   @default_per_page 240
-  @window_radius 1
+  @window_radius 0
+  @max_per_page 300
   @cache_radius 3
   @cache_limit 14
 
@@ -27,7 +28,7 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
       sort_by: valid_sort_by(params),
       sort_order: valid_sort_order(params),
       page: param_to_integer(params["page"], 1),
-      per_page: param_to_integer(params["per_page"], @default_per_page)
+      per_page: clamp_per_page(param_to_integer(params["per_page"], @default_per_page))
     }
 
     options = clamp_page_options(options, socket.assigns.total_pickers)
@@ -110,7 +111,7 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
       id={@dom_id}
       phx-click="change_color"
       phx-value-id={@picker.id}
-      class="group relative aspect-square w-full overflow-hidden rounded-lg border border-zinc-800/20 shadow-sm transition hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-zinc-900/40"
+      class="group relative aspect-square w-full overflow-hidden rounded-lg border border-zinc-800/20 focus:outline-none focus:ring-2 focus:ring-zinc-900/40"
       style={"background-color: #{@picker.color}"}
       title={"Picker ##{@picker.id}"}
     >
@@ -183,6 +184,12 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
   defp clamp_page_options(options, total_pickers) do
     max_page = max(div(total_pickers + options.per_page - 1, options.per_page), 1)
     %{options | page: min(max(options.page, 1), max_page)}
+  end
+
+  defp clamp_per_page(per_page) do
+    per_page
+    |> min(@max_per_page)
+    |> max(50)
   end
 
   defp valid_sort_by(%{"sort_by" => sort_by}) when sort_by in ~w(id color), do: String.to_atom(sort_by)
