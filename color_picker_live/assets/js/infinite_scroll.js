@@ -61,6 +61,15 @@ const InfiniteScroll = {
       }
 
       this.lastScrollTop = this.el.scrollTop
+
+      // Allow consecutive same-direction paging after a swap without requiring
+      // a reverse scroll to unlock the previous edge lock.
+      if (direction === "down") {
+        this.edgeLock.down = false
+      } else if (direction === "up") {
+        this.edgeLock.up = false
+      }
+
       this.suppressTriggersUntil = Date.now() + 70
     }
 
