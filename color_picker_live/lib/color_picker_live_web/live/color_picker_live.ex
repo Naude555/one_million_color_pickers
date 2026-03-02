@@ -5,6 +5,8 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
 
   @default_per_page 240
   @window_radius 1
+  @cache_radius 3
+  @cache_limit 14
 
   def mount(_params, _session, socket) do
     if connected?(socket), do: Pickers.subscribe()
@@ -15,6 +17,7 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
      |> assign(:is_loading, true)
      |> assign(:visible_picker_ids, MapSet.new())
      |> assign(:pending_scroll_direction, :initial)
+     |> assign(:page_cache, %{})
      |> assign(:options, %{sort_by: :id, sort_order: :asc, page: 1, per_page: @default_per_page})
      |> assign(:total_pickers, Pickers.count_pickers())}
   end
@@ -28,13 +31,14 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
     }
 
     options = clamp_page_options(options, socket.assigns.total_pickers)
-    pickers = paged_window(options)
+    {pickers, page_cache} = paged_window(options, socket.assigns.page_cache)
     direction = socket.assigns.pending_scroll_direction
 
     {:noreply,
      socket
      |> assign(:is_loading, false)
      |> assign(:options, options)
+     |> assign(:page_cache, page_cache)
      |> assign(:pending_scroll_direction, :idle)
      |> assign(:visible_picker_ids, MapSet.new(Enum.map(pickers, & &1.id)))
      |> push_event("page-loaded", %{page: options.page, direction: direction})
@@ -117,12 +121,37 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
     """
   end
 
-  defp paged_window(%{page: page} = options) do
-    (page - @window_radius)..(page + @window_radius)
-    |> Enum.filter(&(&1 > 0))
-    |> Enum.flat_map(fn page_number ->
-      Pickers.list_pickers(%{options | page: page_number})
-    end)
+  defp paged_window(%{page: page} = options, cache) do
+    window_pages =
+      (page - @window_radius)..(page + @window_radius)
+      |> Enum.filter(&(&1 > 0))
+
+    preload_pages =
+      (page - @cache_radius)..(page + @cache_radius)
+      |> Enum.filter(&(&1 > 0))
+
+    cache =
+      Enum.reduce(preload_pages, cache, fn page_number, acc ->
+        Map.put_new_lazy(acc, page_number, fn -> Pickers.list_pickers(%{options | page: page_number}) end)
+      end)
+
+    pruned_cache = prune_cache(cache, page)
+
+    pickers =
+      Enum.flat_map(window_pages, fn page_number ->
+        Map.get(pruned_cache, page_number, [])
+      end)
+
+    {pickers, pruned_cache}
+  end
+
+  defp prune_cache(cache, page) do
+    allowed_pages =
+      (page - @cache_limit)..(page + @cache_limit)
+      |> Enum.filter(&(&1 > 0))
+      |> MapSet.new()
+
+    Map.take(cache, MapSet.to_list(allowed_pages))
   end
 
   defp navigate_to_page(socket, direction) do

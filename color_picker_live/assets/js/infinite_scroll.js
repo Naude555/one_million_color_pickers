@@ -5,9 +5,14 @@ const InfiniteScroll = {
     this.lastScrollTop = this.el.scrollTop
     this.suppressTriggersUntil = 0
     this.edgeLock = { up: false, down: false }
+    this.pendingEdgeOffset = 260
 
     this.triggerLoad = direction => {
       if (this.loading) return
+
+      const distanceFromBottom = this.el.scrollHeight - this.el.clientHeight - this.el.scrollTop
+      this.pendingEdgeOffset = direction === "down" ? Math.max(distanceFromBottom, 120) : Math.max(this.el.scrollTop, 120)
+
       this.loading = true
       this.pushEvent(direction === "down" ? "load-more-down" : "load-more-up", {})
     }
@@ -43,7 +48,7 @@ const InfiniteScroll = {
     this.onPageLoaded = ({ direction }) => {
       this.loading = false
 
-      const edgeBuffer = 260
+      const edgeBuffer = Math.max(Math.min(this.pendingEdgeOffset, 420), 120)
 
       if (direction === "down") {
         this.el.scrollTop = edgeBuffer
@@ -54,7 +59,7 @@ const InfiniteScroll = {
       }
 
       this.lastScrollTop = this.el.scrollTop
-      this.suppressTriggersUntil = Date.now() + 120
+      this.suppressTriggersUntil = Date.now() + 100
     }
 
     this.handleEvent("page-loaded", this.onPageLoaded)
