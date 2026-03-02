@@ -45,6 +45,7 @@ defmodule ColorPickerLive.Pickers do
     from(Picker)
     |> sort(options)
     |> paginate(options)
+    |> select([p], %{id: p.id, color: p.color})
     |> Repo.all()
   end
 

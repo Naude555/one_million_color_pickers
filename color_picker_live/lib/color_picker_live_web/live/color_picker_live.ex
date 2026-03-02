@@ -3,7 +3,7 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
 
   alias ColorPickerLive.Pickers
 
-  @default_per_page 300
+  @default_per_page 240
   @window_radius 1
 
   def mount(_params, _session, socket) do
