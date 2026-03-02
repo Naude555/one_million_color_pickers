@@ -4,7 +4,7 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
   alias ColorPickerLive.Pickers
 
   @default_per_page 240
-  @window_radius 0
+  @window_radius 1
   @max_per_page 300
   @cache_radius 3
   @cache_limit 14
