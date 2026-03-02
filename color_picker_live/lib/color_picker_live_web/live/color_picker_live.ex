@@ -4,7 +4,7 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
   alias ColorPickerLive.Pickers
 
   @default_per_page 250
-  @window_radius 2
+  @window_radius 3
 
   def mount(_params, _session, socket) do
     if connected?(socket), do: Pickers.subscribe()

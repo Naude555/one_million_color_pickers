@@ -1,11 +1,35 @@
 const InfiniteScroll = {
   mounted() {
     this.loading = false
+    this.ticking = false
+    this.lastDirection = null
+
+    this.triggerLoad = direction => {
+      if (this.loading) return
+      this.loading = true
+      this.lastDirection = direction
+      this.pushEvent(direction === "down" ? "load-more-down" : "load-more-up", {})
+    }
+
+    this.maybeTriggerLoad = () => {
+      if (this.loading) return
+
+      const scrollRange = this.el.scrollHeight - this.el.clientHeight
+      if (scrollRange <= 0) return
+
+      const ratio = this.el.scrollTop / scrollRange
+
+      if (ratio >= 0.72) {
+        this.triggerLoad("down")
+      } else if (ratio <= 0.28) {
+        this.triggerLoad("up")
+      }
+    }
 
     this.onPageLoaded = ({ direction }) => {
       this.loading = false
 
-      const minOffset = 220
+      const minOffset = 320
       if (direction === "down") {
         this.el.scrollTop = minOffset
       } else if (direction === "up") {
@@ -13,35 +37,24 @@ const InfiniteScroll = {
       } else {
         this.el.scrollTop = Math.max((this.el.scrollHeight - this.el.clientHeight) / 2, 0)
       }
+
+      // If the user scrolled aggressively, chain-load another page immediately.
+      this.maybeTriggerLoad()
     }
 
     this.handleEvent("page-loaded", this.onPageLoaded)
 
-    const debounce = (fn, wait) => {
-      let timer
-      return (...args) => {
-        clearTimeout(timer)
-        timer = setTimeout(() => fn(...args), wait)
-      }
+    this.scrollHandler = () => {
+      if (this.ticking) return
+      this.ticking = true
+
+      requestAnimationFrame(() => {
+        this.maybeTriggerLoad()
+        this.ticking = false
+      })
     }
 
-    this.scrollHandler = debounce(() => {
-      if (this.loading) return
-
-      const distanceFromBottom = this.el.scrollHeight - this.el.scrollTop - this.el.clientHeight
-      const nearTop = this.el.scrollTop < 220
-      const nearBottom = distanceFromBottom < 220
-
-      if (nearBottom) {
-        this.loading = true
-        this.pushEvent("load-more-down", {})
-      } else if (nearTop) {
-        this.loading = true
-        this.pushEvent("load-more-up", {})
-      }
-    }, 40)
-
-    this.el.addEventListener("scroll", this.scrollHandler)
+    this.el.addEventListener("scroll", this.scrollHandler, { passive: true })
   },
 
   destroyed() {
