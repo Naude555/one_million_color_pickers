@@ -5,7 +5,7 @@ const InfiniteScroll = {
     this.onPageLoaded = ({ direction }) => {
       this.loading = false
 
-      const minOffset = 140
+      const minOffset = 220
       if (direction === "down") {
         this.el.scrollTop = minOffset
       } else if (direction === "up") {
@@ -29,8 +29,8 @@ const InfiniteScroll = {
       if (this.loading) return
 
       const distanceFromBottom = this.el.scrollHeight - this.el.scrollTop - this.el.clientHeight
-      const nearTop = this.el.scrollTop < 120
-      const nearBottom = distanceFromBottom < 120
+      const nearTop = this.el.scrollTop < 220
+      const nearBottom = distanceFromBottom < 220
 
       if (nearBottom) {
         this.loading = true
@@ -39,7 +39,7 @@ const InfiniteScroll = {
         this.loading = true
         this.pushEvent("load-more-up", {})
       }
-    }, 120)
+    }, 40)
 
     this.el.addEventListener("scroll", this.scrollHandler)
   },
