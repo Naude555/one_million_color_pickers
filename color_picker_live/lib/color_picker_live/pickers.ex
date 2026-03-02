@@ -4,8 +4,8 @@ defmodule ColorPickerLive.Pickers do
   """
 
   import Ecto.Query, warn: false
-  alias ColorPickerLive.Repo
   alias ColorPickerLive.Pickers.Picker
+  alias ColorPickerLive.Repo
 
   @topic inspect(__MODULE__)
   @pubsub ColorPickerLive.PubSub
@@ -21,7 +21,6 @@ defmodule ColorPickerLive.Pickers do
 
   def broadcast({:error, _changeset}, _tag), do: :error
 
-
   @doc """
   Returns the list of pickers.
 
@@ -35,8 +34,7 @@ defmodule ColorPickerLive.Pickers do
     Repo.all(from(p in Picker, order_by: [asc: p.id]))
   end
 
-
-    @doc """
+  @doc """
   Returns a list of pickers based on the given `options`.
 
   Example options:
@@ -48,6 +46,10 @@ defmodule ColorPickerLive.Pickers do
     |> sort(options)
     |> paginate(options)
     |> Repo.all()
+  end
+
+  def count_pickers do
+    Repo.aggregate(Picker, :count, :id)
   end
 
   defp sort(query, %{sort_by: sort_by, sort_order: sort_order}) do
@@ -63,7 +65,6 @@ defmodule ColorPickerLive.Pickers do
     |> limit(^per_page)
     |> offset(^offset)
   end
-
 
   @doc """
   Gets a single picker.

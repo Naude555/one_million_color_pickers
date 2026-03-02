@@ -4,105 +4,64 @@ defmodule ColorPickerLiveWeb.PickerLiveTest do
   import Phoenix.LiveViewTest
   import ColorPickerLive.PickersFixtures
 
-  @create_attrs %{}
-  @update_attrs %{}
-  @invalid_attrs %{}
+  test "scroll events update URL page without prev/next buttons", %{conn: conn} do
+    Enum.each(1..12, fn index ->
+      picker_fixture(%{color: "#00000#{rem(index, 10)}"})
+    end)
 
-  defp create_picker(_) do
-    picker = picker_fixture()
-    %{picker: picker}
+    {:ok, view, html} = live(conn, ~p"/color_pickers?page=2&per_page=2")
+
+    assert html =~ "One Million Color Pickers"
+    assert html =~ "Current page"
+    assert has_element?(view, "#color-picker-container")
+    refute html =~ "Next →"
+    refute html =~ "← Previous"
+
+    render_hook(view, "load-more-down", %{})
+    assert_patch(view, ~p"/color_pickers?page=3&per_page=2&sort_by=id&sort_order=asc")
+
+    render_hook(view, "load-more-up", %{})
+    assert_patch(view, ~p"/color_pickers?page=2&per_page=2&sort_by=id&sort_order=asc")
   end
 
-  describe "Index" do
-    setup [:create_picker]
+  test "broadcast updates visible picker colors", %{conn: conn} do
+    picker = picker_fixture(%{color: "#000000"})
 
-    test "lists all pickers", %{conn: conn} do
-      {:ok, _index_live, html} = live(conn, ~p"/pickers")
+    {:ok, view, _html} = live(conn, ~p"/color_pickers?page=1&per_page=20")
 
-      assert html =~ "Listing Pickers"
-    end
+    assert has_element?(view, "button[phx-value-id='#{picker.id}']")
 
-    test "saves new picker", %{conn: conn} do
-      {:ok, index_live, _html} = live(conn, ~p"/pickers")
+    ColorPickerLive.Pickers.update_picker(picker, %{color: "#abcdef"})
 
-      assert index_live |> element("a", "New Picker") |> render_click() =~
-               "New Picker"
-
-      assert_patch(index_live, ~p"/pickers/new")
-
-      assert index_live
-             |> form("#picker-form", picker: @invalid_attrs)
-             |> render_change() =~ "can&#39;t be blank"
-
-      assert index_live
-             |> form("#picker-form", picker: @create_attrs)
-             |> render_submit()
-
-      assert_patch(index_live, ~p"/pickers")
-
-      html = render(index_live)
-      assert html =~ "Picker created successfully"
-    end
-
-    test "updates picker in listing", %{conn: conn, picker: picker} do
-      {:ok, index_live, _html} = live(conn, ~p"/pickers")
-
-      assert index_live |> element("#pickers-#{picker.id} a", "Edit") |> render_click() =~
-               "Edit Picker"
-
-      assert_patch(index_live, ~p"/pickers/#{picker}/edit")
-
-      assert index_live
-             |> form("#picker-form", picker: @invalid_attrs)
-             |> render_change() =~ "can&#39;t be blank"
-
-      assert index_live
-             |> form("#picker-form", picker: @update_attrs)
-             |> render_submit()
-
-      assert_patch(index_live, ~p"/pickers")
-
-      html = render(index_live)
-      assert html =~ "Picker updated successfully"
-    end
-
-    test "deletes picker in listing", %{conn: conn, picker: picker} do
-      {:ok, index_live, _html} = live(conn, ~p"/pickers")
-
-      assert index_live |> element("#pickers-#{picker.id} a", "Delete") |> render_click()
-      refute has_element?(index_live, "#pickers-#{picker.id}")
-    end
+    assert render(view) =~ "#abcdef"
   end
 
-  describe "Show" do
-    setup [:create_picker]
+  test "changing a color keeps the picker in place", %{conn: conn} do
+    pickers =
+      Enum.map(1..6, fn index ->
+        picker_fixture(%{color: "#11111#{rem(index, 10)}"})
+      end)
 
-    test "displays picker", %{conn: conn, picker: picker} do
-      {:ok, _show_live, html} = live(conn, ~p"/pickers/#{picker}")
+    target_picker = Enum.at(pickers, 2)
 
-      assert html =~ "Show Picker"
-    end
+    {:ok, view, _html} = live(conn, ~p"/color_pickers?page=1&per_page=6")
 
-    test "updates picker within modal", %{conn: conn, picker: picker} do
-      {:ok, show_live, _html} = live(conn, ~p"/pickers/#{picker}")
+    before_ids = visible_picker_ids(render(view))
 
-      assert show_live |> element("a", "Edit") |> render_click() =~
-               "Edit Picker"
+    assert before_ids == Enum.map(pickers, & &1.id)
 
-      assert_patch(show_live, ~p"/pickers/#{picker}/show/edit")
+    view
+    |> element("button[phx-value-id='#{target_picker.id}']")
+    |> render_click()
 
-      assert show_live
-             |> form("#picker-form", picker: @invalid_attrs)
-             |> render_change() =~ "can&#39;t be blank"
+    after_ids = visible_picker_ids(render(view))
 
-      assert show_live
-             |> form("#picker-form", picker: @update_attrs)
-             |> render_submit()
+    assert after_ids == before_ids
+  end
 
-      assert_patch(show_live, ~p"/pickers/#{picker}")
-
-      html = render(show_live)
-      assert html =~ "Picker updated successfully"
-    end
+  defp visible_picker_ids(html) do
+    Regex.scan(~r/phx-value-id=['\"](\d+)['\"]/, html, capture: :all_but_first)
+    |> List.flatten()
+    |> Enum.map(&String.to_integer/1)
   end
 end
