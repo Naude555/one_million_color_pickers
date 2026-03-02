@@ -2,6 +2,9 @@ const InfiniteScroll = {
   mounted() {
     this.loading = false
     this.ticking = false
+    this.lastScrollTop = this.el.scrollTop
+    this.suppressTriggersUntil = 0
+    this.edgeLock = { up: false, down: false }
 
     this.triggerLoad = direction => {
       if (this.loading) return
@@ -9,17 +12,30 @@ const InfiniteScroll = {
       this.pushEvent(direction === "down" ? "load-more-down" : "load-more-up", {})
     }
 
+    this.updateEdgeLocks = ({ nearTop, nearBottom }) => {
+      if (!nearTop) this.edgeLock.up = false
+      if (!nearBottom) this.edgeLock.down = false
+    }
+
     this.maybeTriggerLoad = () => {
       if (this.loading) return
+      if (Date.now() < this.suppressTriggersUntil) return
 
-      const scrollRange = this.el.scrollHeight - this.el.clientHeight
-      if (scrollRange <= 0) return
+      const scrollTop = this.el.scrollTop
+      const scrollDirection = scrollTop >= this.lastScrollTop ? "down" : "up"
+      this.lastScrollTop = scrollTop
 
-      const ratio = this.el.scrollTop / scrollRange
+      const distanceFromBottom = this.el.scrollHeight - this.el.clientHeight - scrollTop
+      const nearTop = scrollTop <= 220
+      const nearBottom = distanceFromBottom <= 220
 
-      if (ratio >= 0.82) {
+      this.updateEdgeLocks({ nearTop, nearBottom })
+
+      if (nearBottom && scrollDirection === "down" && !this.edgeLock.down) {
+        this.edgeLock.down = true
         this.triggerLoad("down")
-      } else if (ratio <= 0.18) {
+      } else if (nearTop && scrollDirection === "up" && !this.edgeLock.up) {
+        this.edgeLock.up = true
         this.triggerLoad("up")
       }
     }
@@ -36,6 +52,9 @@ const InfiniteScroll = {
       } else {
         this.el.scrollTop = Math.max((this.el.scrollHeight - this.el.clientHeight) / 2, 0)
       }
+
+      this.lastScrollTop = this.el.scrollTop
+      this.suppressTriggersUntil = Date.now() + 120
     }
 
     this.handleEvent("page-loaded", this.onPageLoaded)
