@@ -1,48 +1,61 @@
 const InfiniteScroll = {
-    mounted() {
-       this.el.scrollTop = 5;
-       // Optional: Log to confirm it works
-        console.log("Initial scroll position set to 5.");
-      // Debounce utility function
-      const debounce = (func, delay) => {
-        let timeout;
-        return (...args) => {
-          clearTimeout(timeout);
-          timeout = setTimeout(() => func(...args), delay);
-        };
-      };
-  
-      // Define the scroll handler
-      this.scrollHandler = debounce(() => {
-        const scrollPercentage = (this.el.scrollTop / (this.el.scrollHeight - this.el.clientHeight)) * 100;
-        console.log(this.el.scrollTop);
-        console.log(scrollPercentage);
-        if (scrollPercentage > 60) {
-          this.pushEvent('load-more-down', {});
-        } else if (scrollPercentage < 10 && this.el.scrollTop != 5) {
-          this.pushEvent('load-more-up', {});
-        }
-      }, 200); // 200ms debounce delay
-  
-      // Add the debounced scroll handler to the scroll event
-      this.el.addEventListener('scroll', this.scrollHandler);
-  
-      console.log("Initial scroll position mounted");
-    },
+  mounted() {
+    this.loading = false
+    this.ticking = false
 
-    updated() {
-        if (this.el.scrollTop === 0) {
-          this.el.scrollTop = 6;
-        }
+    this.triggerLoad = direction => {
+      if (this.loading) return
+      this.loading = true
+      this.pushEvent(direction === "down" ? "load-more-down" : "load-more-up", {})
+    }
 
-      },
-    
-      destroyed() {
-        // Remove the scroll handler
-        this.el.removeEventListener('scroll', this.scrollHandler);
+    this.maybeTriggerLoad = () => {
+      if (this.loading) return
+
+      const scrollRange = this.el.scrollHeight - this.el.clientHeight
+      if (scrollRange <= 0) return
+
+      const ratio = this.el.scrollTop / scrollRange
+
+      if (ratio >= 0.82) {
+        this.triggerLoad("down")
+      } else if (ratio <= 0.18) {
+        this.triggerLoad("up")
       }
-    };
-    
-    export default InfiniteScroll;
+    }
 
-  
+    this.onPageLoaded = ({ direction }) => {
+      this.loading = false
+
+      const edgeBuffer = 260
+
+      if (direction === "down") {
+        this.el.scrollTop = edgeBuffer
+      } else if (direction === "up") {
+        this.el.scrollTop = Math.max(this.el.scrollHeight - this.el.clientHeight - edgeBuffer, edgeBuffer)
+      } else {
+        this.el.scrollTop = Math.max((this.el.scrollHeight - this.el.clientHeight) / 2, 0)
+      }
+    }
+
+    this.handleEvent("page-loaded", this.onPageLoaded)
+
+    this.scrollHandler = () => {
+      if (this.ticking) return
+      this.ticking = true
+
+      requestAnimationFrame(() => {
+        this.maybeTriggerLoad()
+        this.ticking = false
+      })
+    }
+
+    this.el.addEventListener("scroll", this.scrollHandler, { passive: true })
+  },
+
+  destroyed() {
+    this.el.removeEventListener("scroll", this.scrollHandler)
+  }
+}
+
+export default InfiniteScroll
