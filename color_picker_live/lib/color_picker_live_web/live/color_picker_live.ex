@@ -4,10 +4,10 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
   alias ColorPickerLive.Pickers
 
   @default_per_page 240
-  @window_radius 1
+  @window_pages 10
   @max_per_page 300
-  @cache_radius 3
-  @cache_limit 14
+  @preload_margin 2
+  @cache_limit 24
 
   def mount(_params, _session, socket) do
     if connected?(socket), do: Pickers.subscribe()
@@ -32,8 +32,9 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
     }
 
     options = clamp_page_options(options, socket.assigns.total_pickers)
-    {pickers, page_cache} = paged_window(options, socket.assigns.page_cache)
+    total_pages = total_pages(socket.assigns.total_pickers, options.per_page)
     direction = socket.assigns.pending_scroll_direction
+    {pickers, page_cache} = paged_window(options, socket.assigns.page_cache, direction, total_pages)
 
     {:noreply,
      socket
@@ -122,34 +123,50 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
     """
   end
 
-  defp paged_window(%{page: page} = options, cache) do
-    window_pages =
-      (page - @window_radius)..(page + @window_radius)
-      |> Enum.filter(&(&1 > 0))
+  defp paged_window(%{page: page} = options, cache, direction, total_pages) do
+    pages = window_pages(page, direction, total_pages)
 
     preload_pages =
-      (page - @cache_radius)..(page + @cache_radius)
-      |> Enum.filter(&(&1 > 0))
+      pages
+      |> Enum.flat_map(fn p -> (p - @preload_margin)..(p + @preload_margin) end)
+      |> Enum.filter(&(&1 > 0 and &1 <= total_pages))
+      |> Enum.uniq()
 
     cache =
       Enum.reduce(preload_pages, cache, fn page_number, acc ->
         Map.put_new_lazy(acc, page_number, fn -> Pickers.list_pickers(%{options | page: page_number}) end)
       end)
 
-    pruned_cache = prune_cache(cache, page)
+    pruned_cache = prune_cache(cache, page, total_pages)
 
     pickers =
-      Enum.flat_map(window_pages, fn page_number ->
+      Enum.flat_map(pages, fn page_number ->
         Map.get(pruned_cache, page_number, [])
       end)
 
     {pickers, pruned_cache}
   end
 
-  defp prune_cache(cache, page) do
+  defp window_pages(page, direction, total_pages) do
+    start_page =
+      case direction do
+        :down -> page
+        :up -> page - @window_pages + 1
+        _ -> page - div(@window_pages, 2)
+      end
+
+    start_page..(start_page + @window_pages - 1)
+    |> Enum.filter(&(&1 > 0 and &1 <= total_pages))
+    |> Enum.take(@window_pages)
+  end
+
+  defp prune_cache(cache, page, total_pages) do
+    min_page = max(page - @cache_limit, 1)
+    max_page = min(page + @cache_limit, total_pages)
+
     allowed_pages =
-      (page - @cache_limit)..(page + @cache_limit)
-      |> Enum.filter(&(&1 > 0))
+      min_page..max_page
+      |> Enum.to_list()
       |> MapSet.new()
 
     Map.take(cache, MapSet.to_list(allowed_pages))
@@ -181,8 +198,13 @@ defmodule ColorPickerLiveWeb.ColorPickerLive do
     ~p"/color_pickers?#{%{options | page: page}}"
   end
 
+
+  defp total_pages(total_pickers, per_page) do
+    max(div(total_pickers + per_page - 1, per_page), 1)
+  end
+
   defp clamp_page_options(options, total_pickers) do
-    max_page = max(div(total_pickers + options.per_page - 1, options.per_page), 1)
+    max_page = total_pages(total_pickers, options.per_page)
     %{options | page: min(max(options.page, 1), max_page)}
   end
 
